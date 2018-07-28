@@ -80,17 +80,20 @@ class SearchWindow:
         t.start()
 
     def monitor_page(self):
-        current = ''
         update_msg = ''
         found_msg = ''
+        old_item_list = []
+        headers = {"Accept-Language": "en-US, en; q=0.5"}
         self.retry_btn.state(['disabled'])
         self.status.config(text='Status: Running', background='green')
         while self.repeat:
-            item_list = ''
+            new_item_list = []
+            items = ''
             msg = ''
+            page_updated = False
 
             try:
-                html = requests.get(self.url).text
+                html = requests.get(self.url, headers=headers).text
                 elements = PyQuery(html)
                 selected_elements = elements(self.selector)
 
@@ -100,18 +103,26 @@ class SearchWindow:
                 if title != '':
                     self.root.title(title)
 
-                for i, name in enumerate(selected_elements):
-                    item_list += '{0:02d}. {1}\n'.format((i + 1), name.text_content().strip())
+                for item in selected_elements:
+                    if item.text_content().strip() not in old_item_list:
+                        new_item_list.append(item.text_content().strip())
+                        page_updated = True
+
+                old_item_list = new_item_list + old_item_list
+
+                pad = len(str(len(old_item_list)))
+                for i, name in enumerate(old_item_list):
+                    items += '{0:0{1}d}. {2}\n'.format((i + 1),pad, name)
 
                 self.content.config(state='normal')
                 self.content.delete('1.0', END)
-                self.content.insert(INSERT, item_list)
+                self.content.insert(INSERT, items)
 
                 msg += 'Search String: {}\n'.format(self.text.capitalize())
 
-                if current != item_list:
+                if page_updated:
                     update_msg = 'Page Updated at {}'.format(ctime())
-                    if selected_elements.text().lower().find(self.text) >= 0 and self.text != 'none':
+                    if items.lower().find(self.text) >= 0 and self.text != 'none':
                         found_msg = self.text.capitalize() + ' found'
                     self.root.deiconify()
 
@@ -129,7 +140,6 @@ class SearchWindow:
                 break
             finally:
                 self.content.config(state='disable')
-            current = item_list
             sleep(self.time)
 
 
